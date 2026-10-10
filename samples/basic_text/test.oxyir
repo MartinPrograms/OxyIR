@@ -1,0 +1,164 @@
+const char* testingCode = R"(
+
+# test cases written by Claude since I am lazy.
+
+struct :test_struct { i32, i64 }
+
+data i32 $gint       = 42
+data f32 $gfloat32   = 1.5
+data f64 $gfloat64   = 3.14
+data :test_struct $gstruct = { 10, 20 }
+data [i32, 4] $garray      = { 1, 2, 3, 4 }
+
+# Region: Arithmetic
+fn void $test_arithmetic(i32 %a, i32 %b, f64 %fa, f64 %fb) {
+@entry
+    # Signed
+    %adds_r = adds i32 %a, %b
+    %subs_r = subs i32 %a, %b
+    %muls_r = muls i32 %a, %b
+    %divs_r = divs i32 %a, %b
+    %rems_r = rems i32 %a, %b
+    %negs_r = neg i32 %a
+    # Unsigned
+    %addu_r = addu i32 %a, %b
+    %subu_r = subu i32 %a, %b
+    %mulu_r = mulu i32 %a, %b
+    %divu_r = divu i32 %a, %b
+    %remu_r = remu i32 %a, %b
+    # Float — no signedness suffix, neg valid for float
+    %add_f  = add f64 %fa, %fb
+    %sub_f  = sub f64 %fa, %fb
+    %mul_f  = mul f64 %fa, %fb
+    %div_f  = div f64 %fa, %fb
+    %rem_f  = rem f64 %fa, %fb
+    %neg_f  = neg f64 %fa
+    ret void
+}
+
+# Region: Bitwise
+fn void $test_bitwise(i32 %a, i32 %b) {
+@entry
+    # No signed/unsigned variants for bitwise ops
+    %and_r = and i32 %a, %b
+    %or_r  = or  i32 %a, %b
+    %xor_r = xor i32 %a, %b
+    %not_r = not i32 %a
+    %shl_r = shl i32 %a, %b
+    %shr_r = shr i32 %a, %b
+    ret void
+}
+
+# Region: Comparison
+fn void $test_comparison(i32 %a, i32 %b, f64 %fa, f64 %fb) {
+@entry
+    # eq/ne have no signed/unsigned variant
+    %eq_r  = eq i32 %a, %b
+    %ne_r  = ne i32 %a, %b
+    # Signed
+    %lts_r = lts i32 %a, %b
+    %gts_r = gts i32 %a, %b
+    %les_r = les i32 %a, %b
+    %ges_r = ges i32 %a, %b
+    # Unsigned
+    %ltu_r = ltu i32 %a, %b
+    %gtu_r = gtu i32 %a, %b
+    %leu_r = leu i32 %a, %b
+    %geu_r = geu i32 %a, %b
+    # Float — no signedness suffix
+    %lt_f  = lt f64 %fa, %fb
+    %gt_f  = gt f64 %fa, %fb
+    %le_f  = le f64 %fa, %fb
+    %ge_f  = ge f64 %fa, %fb
+    ret void
+}
+
+# Region: Memory
+fn void $test_memory() {
+@entry
+    %p1 = alloca i32
+    %p2 = alloca i32, 4
+    %p3 = alloca_align i32, 16
+    %p4 = alloca_align i32, 16, 4
+    store i32 %p1, 100
+    %v1 = load i32 %p1
+    %ps = copy :test_struct $gstruct
+    %f0 = gep :test_struct %ps, 0
+    %f1 = gep :test_struct %ps, 1
+    store i32 %f0, 99
+    store i64 %f1, 999
+    %pa = copy [i32, 4] $garray
+    %e2 = gep [i32, 4] %pa, 2
+    store i32 %e2, 42
+    ret void
+}
+
+# Region: Cast
+fn void $test_cast(i32 %i, i8 %small, f32 %f32val, f64 %f64val, ptr %p) {
+@entry
+    # Signed/unsigned truncation
+    %truncs_r      = truncs i8 i32 %i
+    %truncu_r      = truncu i8 i32 %i
+    # Signed/unsigned zero-extend
+    %zexts_r       = zexts i32 i8 %small
+    %zextu_r       = zextu i32 i8 %small
+    # Signed/unsigned sign-extend
+    %sexts_r       = sexts i32 i8 %small
+    %sextu_r       = sextu i32 i8 %small
+    # Float casts — no signedness suffix
+    %fptrunc_r     = fptrunc f32 f64 %f64val
+    %fpext_r       = fpext   f64 f32 %f32val
+    # Pointer casts — no signedness suffix
+    %ptrtoint_r    = ptrtoint i64 ptr %p
+    %inttoptr_r    = inttoptr ptr i64 %ptrtoint_r
+    # int <-> float, signed/unsigned affects source interpretation
+    %inttofloats_r = inttofloats f64 i32 %i
+    %inttofloatu_r = inttofloatu f64 i32 %i
+    # floattoint always produces signed, no suffix
+    %floattoint_r  = floattoint i32 f64 %f64val
+    ret void
+}
+
+# Region: Control Flow
+fn i32 $test_control_flow(i32 %a, i32 %b) {
+@entry
+    %cond = lts i32 %a, %b
+    jnz i1 %cond, @is_less, @not_less
+@is_less
+    jmp @done
+@not_less
+    jmp @done
+@done
+    # phi must be first instruction in a block
+    %result = phi i32, @is_less %a, @not_less %b
+    ret i32 %result
+}
+
+# Region: General
+fn i32 $test_call_target(i32 %x, f64 %y) {
+@entry
+    ret i32 %x
+}
+
+fn i32 $test_variadic_target(i32 %count, ...) {
+@entry
+    %vl  = alloca va_list
+    vastart %vl
+    %vl2 = alloca va_list
+    vacopy %vl2, %vl     # Save va_list state before consuming args
+    %a1  = vaarg i32 %vl
+    %a2  = vaarg i32 %vl2
+    ret i32 %a1
+}
+
+fn i32 $test_general(i32 %a, f64 %b) {
+@entry
+    %call_r = call i32 $test_call_target, i32 %a, f64 %b
+    %copy_r = copy i32 %call_r
+    %bc_r   = bitcast f32 i32 %call_r   # Verbatim reinterpret, both 32-bit
+    # %asm_r  = asm i32, "mov %0, %1", i32 %a TODO: inline assembly support
+    %vcall  = call i32 $test_variadic_target, i32 %a, ..., i32 42, i32 100
+    ret i32 %copy_r
+}
+
+)";
