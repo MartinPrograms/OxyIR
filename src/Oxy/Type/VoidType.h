@@ -8,6 +8,14 @@ namespace Oxy {
     public:
         VoidType() : Type(Kind::Void) {}
         ~VoidType() override = default;
+
+        [[nodiscard]] bool matches(const Type *other) const override {
+            if (auto otherVoid = dynamic_cast<const VoidType*>(other)) {
+                return true;
+            }
+
+            return false;
+        }
     };
 } // Oxy
 

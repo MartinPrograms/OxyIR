@@ -14,6 +14,7 @@ namespace Oxy {
         [[nodiscard]] size_t getSize() const;
         [[nodiscard]] bool isPacked() const;
         [[nodiscard]] size_t getAlignment() const;
+        [[nodiscard]] bool matches(const Type *other) const override;
 
     private:
         Type* _elementType;

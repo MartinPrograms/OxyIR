@@ -10,6 +10,14 @@ namespace Oxy {
     public:
         PointerType() : Type(Kind::Pointer) {}
         ~PointerType() override = default;
+
+        [[nodiscard]] bool matches(const Type *other) const override {
+            if (auto otherPointer = dynamic_cast<const PointerType*>(other)) {
+                return true;
+            }
+
+            return false;
+        }
     }; // Oxy
 }
 

@@ -14,6 +14,8 @@ namespace Oxy {
         [[nodiscard]] const std::vector<Type*>& getMemberTypes() const;
         [[nodiscard]] size_t getAlignment() const;
 
+        [[nodiscard]] bool matches(const Type *other) const override;
+
     private:
         std::vector<Type*> _memberTypes;
         size_t _alignment;

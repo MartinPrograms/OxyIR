@@ -54,7 +54,7 @@ namespace Oxy {
 
         ArrayType* arrayType(Type* elementType, size_t count);
         StructType* structType(std::vector<Type*> members, size_t alignment = 0);
-        FunctionType* functionType(Type* returnType, std::vector<Type*> params, bool isVarArg = false);
+        FunctionType* functionType(Type* returnType, std::vector<Type*> params, FunctionType::CallingConvention callConv, bool isVarArg = false);
         Literal* literal(PrimitiveType* i32, Literal::Data data);
         TypeValue* typeValue(Type* type);
 

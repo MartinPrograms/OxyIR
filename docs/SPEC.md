@@ -77,12 +77,12 @@ data [i8, 4] $stringData = "argc: %d, argv[0]: %s\0"
 fn i8 export $main(i32 %argc, ptr %argv) {
 @entry
     # Call the function with the parameters
-    %result = call i32 $printf, ptr $stringData, ..., i32 %argc, ptr %argv
+    %result = call (ptr, ...) -> i32 $printf, ptr $stringData, ..., i32 %argc, ptr %argv
     ret i8 0
 }
 ```
 The symbol `$functionName` is now a function pointer to `(i32, f64) -> i32`, which is the type of the function.
-Function types are declared as `(paramType1, paramType2) -> returnType`
+Function types are declared as `(paramType1, paramType2) -> returnType` or `(paramType1, paramType2) conv -> returnType` where conv is the calling convention, as defined below. No mentioned conv is the same as `c`
 
 To get the variadic arguments you must use vaastart on a va_list variable, and then use vaarg to retrieve each argument, which will be of the type specified in the function definition.
 
@@ -94,16 +94,34 @@ vastart %vl
 ```
 
 Function call:
+A call always states the full function type of the callee, followed by the callee and then the arguments. The callee can be any value that evaluates to a pointer, so both direct calls (`$symbol`) and indirect calls (`%pointer`) use the same syntax.
 ``` 
-%result = call i32 $functionName, i32 42, f64 3.14
-%result = call i32 $printf, ptr $formatString, ..., i32 42, f64 3.14 # calling a variadic function, with the variadic arguments seperated from the normal arguments with ...
+%result = call (i32, f64) -> i32 $functionName, i32 42, f64 3.14
+%result = call (ptr, ...) -> i32 $printf, ptr $formatString, ..., i32 42, f64 3.14 # calling a variadic function, with the variadic arguments seperated from the normal arguments with ...
+%result = call (i32, i32) fast -> i32 %functionPointer, i32 1, i32 2 # indirect call through a pointer, using the fast calling convention
+call (ptr) -> void $free, ptr %memory # calling a void function, so `%result =` is omitted
 ```
+
+The function type of a call must follow these rules:
+- For a direct call to a `$symbol`, the function type must be identical to the declared type of that function, including the calling convention.
+- For an indirect call the function type cannot be checked against a declaration, so it is the only source of the calling convention, parameter types and return type. Calling a pointer with a type that does not match the function it points to is undefined behavior.
+- The number of fixed arguments must equal the number of parameters in the function type, and each fixed argument must have the type of its corresponding parameter.
+- If the function type is variadic, `...` must appear exactly after the last fixed argument (even if no variadic arguments follow). If the function type is not variadic, `...` must not appear.
+- The result type is the return type of the function type. If the return type is `void`, `%result =` must be omitted, otherwise it must be present.
 
 ### Flags
 Functions can have the following flags:
 - `export`: the function is exported and can be called from outside the module
 - `inline`: the function is a candidate for inlining, which means that the compiler may choose to replace calls to the function with the body of the function itself, to improve performance (this is just a hint, the compiler may choose to ignore it)
 - `extern`: the function is defined outside the module
+
+#### Conventions
+- `c`: the function uses the default C calling convention
+- `fast`: the function uses the fastcall calling convention
+- `cold`: the function uses the coldcall calling convention
+- `sysv64`: the function uses the SysV64 calling convention
+- `win64`: the function uses the Win64 calling convention
+- `aapcs64`: the function uses the Aapcs64 calling convention
 
 ### Labels
 Labels are declared using @ followed by the name of the label. They are used as targets for control flow instructions.
@@ -211,7 +229,7 @@ But `ptrtoint` and `inttoptr` do not have signed or unsigned versions, as they o
 ### General Instructions
 | Instruction | Operands                                                      | Result Type | Description                                                                                                                                                                                                                                                                                                                                                           |
 |-------------|---------------------------------------------------------------|-------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `call`      | `type operand, type1 arg1, type2 arg2`                        | `type`      | Calls a function. The first operand must be a pointer to a function type, and the arguments must match the parameter types of the function. The result type must match the return type of the function. The variadic arguments, and normal arguments must be seperated with `...` as shown in the operands. If the function is `void` `%result =` needs to be omitted |
+| `call`      | `function_type operand, type1 arg1, type2 arg2`               | `type`      | Calls a function. `function_type` is the full function type of the callee (e.g. `(i32, ptr) fast -> i32`), and the operand must be a pointer to a function of that type. The arguments must match the parameter types of the function type, and the result type is its return type. The variadic arguments, and normal arguments must be seperated with `...` as shown in the operands. If the function is `void` `%result =` needs to be omitted. See [Functions](#functions) for the full rules. |
 | `vaarg`     | `result_type va_list_operand`                                 | `type`      | Retrieves the next argument from a variadic function. The operand must be a pointer to a `va_list` type, and the result type must be the type of the argument being retrieved.                                                                                                                                                                                        |
 | `vastart`   | `operand`                                                     | `void`      | Initializes a `va_list` variable for use in a variadic function. The operand must be a pointer to a `va_list` type, and no type is required since the operand is always of `va_list`.                                                                                                                                                                                 | 
 | `vacopy`    | `dest_va_list_operand, src_va_list_operand`                   | `void`      | Copies the state of one `va_list` variable to another. Both operands must be pointers to `va_list` types. This is useful for saving the state of a `va_list` before retrieving arguments, and restoring it later if needed.                                                                                                                                           |

@@ -11,6 +11,10 @@ namespace Oxy {
 
         [[nodiscard]] Kind getKind() const { return _kind; }
 
+        [[nodiscard]] virtual bool matches(const Type *other) const {
+            return _kind == other->_kind;
+        }
+
     private:
         Kind _kind;
     };

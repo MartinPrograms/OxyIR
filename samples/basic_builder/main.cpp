@@ -7,7 +7,7 @@ int main() {
     Oxy::Context context;
     Oxy::Module module(&context, Oxy::Module::Architecture::Amd64, "test_module");
 
-    auto mainFunc = module.addFunction(context.functionType(context.i32(), {context.i32(), context.ptr()}), "main", Oxy::Function::Flags::Export);
+    auto mainFunc = module.addFunction(context.functionType(context.i32(), {context.i32(), context.ptr()}, Oxy::FunctionType::CallingConvention::C), "main", Oxy::Function::Flags::Export);
 
     auto entryBlock = mainFunc->addEntryBlock();
     auto condBlock = mainFunc->addBlock("cond");

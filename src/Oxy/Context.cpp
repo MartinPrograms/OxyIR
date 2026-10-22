@@ -71,8 +71,8 @@ namespace Oxy {
         return ptr;
     }
 
-    FunctionType* Context::functionType(Type* returnType, std::vector<Type*> params, bool isVarArg) {
-        auto funcTy = std::make_unique<FunctionType>(returnType, params, isVarArg);
+    FunctionType* Context::functionType(Type* returnType, std::vector<Type*> params, FunctionType::CallingConvention callConv, bool isVarArg) {
+        auto funcTy = std::make_unique<FunctionType>(returnType, params, callConv, isVarArg);
         FunctionType* ptr = funcTy.get();
         _functionTypes.push_back(std::move(funcTy));
         return ptr;

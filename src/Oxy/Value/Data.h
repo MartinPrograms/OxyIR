@@ -16,13 +16,12 @@ namespace Oxy {
             Align = 1 << 3
         };
 
-        Data(Type* type, std::string name, Flags flags = Flags::None, size_t alignment = 0, std::vector<uint8_t> initialValue = {})
-            : _pointerType(new PointerType()), _type(type), _name(std::move(name)), _flags(flags), _alignment(alignment), _initialValue(std::move(initialValue)) {}
+        Data(Type* type, std::string name, Flags flags = Flags::None, size_t alignment = 0, std::vector<uint8_t> initialValue = {}) : _type(type), _name(std::move(name)), _flags(flags), _alignment(alignment), _initialValue(std::move(initialValue)) {}
 
         ~Data() override = default;
 
         [[nodiscard]] Type* getType() const override {
-            return _pointerType;
+            return _pointerType.get();
         }
 
         [[nodiscard]] Type* getElementType() const {
@@ -46,7 +45,7 @@ namespace Oxy {
         }
 
     private:
-        Type* _pointerType;
+        std::unique_ptr<Type> _pointerType = std::make_unique<PointerType>();
         Type* _type;
         std::string _name;
         Flags _flags;

@@ -210,11 +210,11 @@ namespace Oxy {
         return ptr;
     }
 
-    Instructions::CallOperation * BasicBlock::addCall(Value *callee, std::vector<Value *> args) {
+    Instructions::CallOperation * BasicBlock::addCall(Value *callee, FunctionType* functionType, std::vector<Value *> args) {
         if (hasTerminator())
             _context->emitError("Cannot add call instruction to block '" + getName() + "' because it has been terminated");
 
-        auto instr = std::make_unique<Instructions::CallOperation>(callee, std::move(args));
+        auto instr = std::make_unique<Instructions::CallOperation>(callee, functionType, std::move(args));
         auto ptr = instr.get();
         _instructions.push_back(std::move(instr));
         return ptr;

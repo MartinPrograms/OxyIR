@@ -60,7 +60,7 @@ namespace Oxy {
         Instructions::GetElementPointerOperation* addGetElementPointer(Type* type, Value* operand, std::vector<Value*> indices);
         Instructions::CastOperation* addCast(Instructions::CastOperation::Opcode opcode, Instructions::CastOperation::Signedness signedness, Value* operand, Type* resultType);
 
-        Instructions::CallOperation* addCall(Value* callee, std::vector<Value*> args);
+        Instructions::CallOperation* addCall(Value* callee, FunctionType* functionType, std::vector<Value*> args);
 
         Instructions::JumpOperation* addJump(const BasicBlock* target);
         Instructions::JumpNotZeroOperation* addJumpNotZero(Value* condition, const BasicBlock* trueTarget, const BasicBlock* falseTarget);

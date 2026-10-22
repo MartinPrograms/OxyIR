@@ -3,6 +3,8 @@
 
 #include <unordered_set>
 
+#include "Utilities.h"
+
 namespace Oxy {
     std::unique_ptr<Module> IRParser::parse() {
         _tokens = Tokenizer(_input).tokenize();
@@ -582,9 +584,14 @@ namespace Oxy {
     }
 
     Value * IRParser::parseCallInstruction(BasicBlock *basic_block) {
-        // call returnType functionTarget, argType1 arg1, argType2 arg2, ...
-        auto returnType = parseType();
-        if (!returnType) {
+        // call <funcType> <functionTarget>, <argType1> arg1, argType2 arg2, ...
+        auto funcType = parseType();
+        if (!funcType) {
+            return nullptr;
+        }
+
+        if (!dynamic_cast<FunctionType*>(funcType)) {
+            _context->emitError("Expected function type for call instruction at line " + std::to_string(peekToken() ? peekToken()->line : 0) + ", column " + std::to_string(peekToken() ? peekToken()->column : 0));
             return nullptr;
         }
 
@@ -595,7 +602,7 @@ namespace Oxy {
         }
 
         auto commaToken = getToken();
-        if (!commaToken && commaToken->type != TokenType::Syntax && commaToken->value != ",") {
+        if (!commaToken || commaToken->type != TokenType::Syntax || commaToken->value != ",") {
             return nullptr;
         }
 
@@ -624,7 +631,12 @@ namespace Oxy {
             arguments.push_back(argValue);
         }
 
-        return basic_block->addCall(functionValue, arguments);
+        auto fnType = dynamic_cast<FunctionType *>(funcType);
+        if (fnType && !verifyCallArguments(fnType, arguments)) {
+            return nullptr;
+        }
+
+        return basic_block->addCall(functionValue, fnType, arguments);
     }
 
     Value *IRParser::parseVaCopyInstruction(BasicBlock *basic_block) {
@@ -635,7 +647,7 @@ namespace Oxy {
         }
 
         auto commaToken = getToken();
-        if (!commaToken && commaToken->type != TokenType::Syntax && commaToken->value != ",") {
+        if (!commaToken || commaToken->type != TokenType::Syntax || commaToken->value != ",") {
             return nullptr;
         }
 
@@ -645,6 +657,21 @@ namespace Oxy {
         }
 
         return basic_block->addVaCopy(dest, src);
+    }
+
+    Value *IRParser::parseVaArgInstruction(BasicBlock *basic_block) {
+        // vaarg <result_type> <operand>
+        auto type = parseType();
+        if (!type) {
+            return nullptr;
+        }
+
+        auto operand = parseOperand(_context->ptr());
+        if (!operand) {
+            return nullptr;
+        }
+
+        return basic_block->addVaArg(type, operand);
     }
 
     Value *IRParser::parseStatement(BasicBlock *basic_block) {
@@ -710,7 +737,7 @@ namespace Oxy {
         if (opName == "phi") return parsePhiInstruction(basic_block);
         if (opName == "vastart") return basic_block->addVaStart(parseOperand(_context->ptr()));
         if (opName == "vacopy") return parseVaCopyInstruction(basic_block);
-        if (opName == "vaarg") return basic_block->addVaArg(parseType(), parseOperand(_context->ptr()));
+        if (opName == "vaarg") return parseVaArgInstruction(basic_block);
         if (opName == "call") return parseCallInstruction(basic_block);
 
         return nullptr;
@@ -825,6 +852,69 @@ namespace Oxy {
         }
     }
 
+    bool IRParser::tryConvention(const std::string &value, FunctionType::CallingConvention *out) {
+        if (value == "c") {
+            *out = FunctionType::CallingConvention::C;
+            return true;
+        }
+
+        if (value == "fast") {
+            *out = FunctionType::CallingConvention::Fast;
+            return true;
+        }
+
+        if (value == "cold") {
+            *out = FunctionType::CallingConvention::Cold;
+            return true;
+        }
+
+        if (value == "sysv64") {
+            *out = FunctionType::CallingConvention::SysV64;
+            return true;
+        }
+
+        if (value == "win64") {
+            *out = FunctionType::CallingConvention::Win64;
+            return true;
+        }
+
+        if (value == "aapcs64") {
+            *out = FunctionType::CallingConvention::Aapcs64;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool IRParser::verifyCallArguments(FunctionType *fnType, const std::vector<Value *> &vector) {
+        if (!fnType)
+            return false;
+
+        if (fnType->isVarArg()) {
+            if (vector.size() < fnType->getParamTypes().size()) {
+                _context->emitError("Function call has too few arguments. Expected at least " + std::to_string(fnType->getParamTypes().size()) + ", got " + std::to_string(vector.size()));
+                return false;
+            }
+        } else {
+            if (vector.size() != fnType->getParamTypes().size()) {
+                _context->emitError("Function call has wrong number of arguments. Expected " + std::to_string(fnType->getParamTypes().size()) + ", got " + std::to_string(vector.size()));
+                return false;
+            }
+        }
+
+        for (size_t i = 0; i < fnType->getParamTypes().size(); i++) {
+            auto expectedType = fnType->getParamTypes()[i];
+            auto actualType = vector[i]->getType();
+
+            if (!expectedType->matches(actualType)) {
+                _context->emitError("Function call argument " + std::to_string(i) + " has wrong type. Expected " + Utilities::type_to_string(expectedType) + ", got " + Utilities::type_to_string(actualType));
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     void IRParser::parseFn() {
         _functionArguments.clear();
 
@@ -836,6 +926,9 @@ namespace Oxy {
             _context->emitError("Expected return type after 'fn' keyword in function declaration at line " + std::to_string(peekToken() ? peekToken()->line : 0) + ", column " + std::to_string(peekToken() ? peekToken()->column : 0));
             return;
         }
+
+        auto callConv = FunctionType::CallingConvention::C;
+        auto parsedConvention = false;
 
         uint32_t flags = 0;
         while (true) {
@@ -855,6 +948,13 @@ namespace Oxy {
                 } else if (token->value == "extern") {
                     flags |= (uint32_t)Function::Flags::Extern;
                     getToken();
+                } else if (tryConvention(token->value, &callConv)) {
+                    if (parsedConvention) {
+                        _context->emitWarning("Multiple calling conventions specified, the last one is used. Function declaration at line " + std::to_string(token->line) + ", column " + std::to_string(token->column));
+                    }
+
+                    parsedConvention = true;
+                    getToken(); // Skip
                 } else {
                     _context->emitError("Unknown flag '" + token->value + "' in function declaration at line " + std::to_string(token->line) + ", column " + std::to_string(token->column));
                     return;
@@ -927,7 +1027,7 @@ namespace Oxy {
             }
         }
 
-        auto funcType = _context->functionType(returnType, paramTypes, isVarArg);
+        auto funcType = _context->functionType(returnType, paramTypes, callConv, isVarArg);
         auto func = _module->addFunction(funcType, nameToken->value, flags);
         _variables.clear(); // Clear the variable map for the new function
 
@@ -1398,9 +1498,29 @@ namespace Oxy {
             }
         }
 
-        auto arrow = getToken();
-        if (!arrow || arrow->type != TokenType::Syntax || arrow->value != "->") {
-            _context->emitError("Expected '->' after parameter list in function type declaration at line " + std::to_string(peekToken() ? peekToken()->line : 0) + ", column " + std::to_string(peekToken() ? peekToken()->column : 0));
+        auto callConv = FunctionType::CallingConvention::C;
+        auto arrowOrConv = getToken();
+
+        if (!arrowOrConv) {
+            _context->emitError("Expected '->' or calling convention after function type parameters at line " + std::to_string(peekToken() ? peekToken()->line : 0) + ", column " + std::to_string(peekToken() ? peekToken()->column : 0));
+            return nullptr;
+        }
+
+        if (arrowOrConv->type != TokenType::Syntax) {
+            // this is a convention, or should be.
+            if (tryConvention(arrowOrConv->value, &callConv)) {
+                auto arrow = getToken();
+
+                if (!arrow || arrow->type != TokenType::Syntax || arrow->value != "->") {
+                    _context->emitError("Expected '->' after calling convention in function type declaration at line " + std::to_string(arrow ? arrow->line : 0) + ", column " + std::to_string(arrow ? arrow->column : 0));
+                    return nullptr;
+                }
+            } else {
+                _context->emitError("Expected '->' or calling convention after function type parameters at line " + std::to_string(arrowOrConv ? arrowOrConv->line : 0) + ", column " + std::to_string(arrowOrConv ? arrowOrConv->column : 0));
+                return nullptr;
+            }
+        } else if (arrowOrConv->value != "->") {
+            _context->emitError("Expected '->' after function type parameters at line " + std::to_string(arrowOrConv ? arrowOrConv->line : 0) + ", column " + std::to_string(arrowOrConv ? arrowOrConv->column : 0));
             return nullptr;
         }
 
@@ -1410,7 +1530,7 @@ namespace Oxy {
             return nullptr;
         }
 
-        return _context->functionType(returnType, paramTypes, isVarArg);
+        return _context->functionType(returnType, paramTypes, callConv, isVarArg);
     }
 
     Type* IRParser::parseType() {

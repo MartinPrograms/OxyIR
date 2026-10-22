@@ -135,29 +135,30 @@ fn i32 $test_control_flow(i32 %a, i32 %b) {
 }
 
 # Region: General
-fn i32 $test_call_target(i32 %x, f64 %y) {
+fn i32 fast $test_call_target(i32 %x, f64 %y) {
 @entry
     ret i32 %x
 }
 
 fn i32 $test_variadic_target(i32 %count, ...) {
 @entry
-    %vl  = alloca va_list
+    %vl = alloca va_list
     vastart %vl
     %vl2 = alloca va_list
     vacopy %vl2, %vl     # Save va_list state before consuming args
-    %a1  = vaarg i32 %vl
-    %a2  = vaarg i32 %vl2
+    %a1 = vaarg i32 %vl
+    %a2 = vaarg i32 %vl2
     ret i32 %a1
 }
 
+
 fn i32 $test_general(i32 %a, f64 %b) {
 @entry
-    %call_r = call i32 $test_call_target, i32 %a, f64 %b
+    %call_r = call (i32, f64) fast -> i32 $test_call_target, i32 %a, f64 %b
     %copy_r = copy i32 %call_r
     %bc_r   = bitcast f32 i32 %call_r   # Verbatim reinterpret, both 32-bit
     # %asm_r  = asm i32, "mov %0, %1", i32 %a TODO: inline assembly support
-    %vcall  = call i32 $test_variadic_target, i32 %a, ..., i32 42, i32 100
+    %vcall  = call (i32, ...) -> i32 $test_variadic_target, i32 %a, ..., i32 42, i32 100
     ret i32 %copy_r
 }
 

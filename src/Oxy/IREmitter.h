@@ -16,6 +16,8 @@ namespace Oxy {
         void emitFunction(const Function* func);
         void emitBasicBlock(const BasicBlock* block);
         void emitInstruction(const Instruction* instr);
+
+        std::string callingConventionToString(FunctionType::CallingConvention calling_convention);
         void emitType(const Type* type);
         void emitValue(const Value* value);
         void emitGlobal(const Data* data);

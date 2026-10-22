@@ -1,5 +1,6 @@
 #include "IREmitter.h"
 
+#include "Utilities.h"
 #include "Type/VariadicListType.h"
 #include "Value/ArgumentValue.h"
 #include "Value/Literal.h"
@@ -37,6 +38,11 @@ namespace Oxy {
             if (flags & Function::Flags::Extern) {
                 _output << " extern";
             }
+        }
+
+        auto callConv = funcType->getCallingConvention();
+        if (callConv != FunctionType::CallingConvention::C) {
+            _output << " " << callingConventionToString(callConv);
         }
 
         _output << " $" << func->getName() << "(";
@@ -372,7 +378,7 @@ namespace Oxy {
 
         if (auto call = dynamic_cast<const Instructions::CallOperation*>(instr)) {
             // %<result> = call <type> <callee>, <type1> <arg1>, <type2> <arg2>, ..., <typeN> <argN>
-            if (((FunctionType*)call->getCallee()->getType())->getReturnType()->getKind() == Type::Kind::Void) {
+            if (call->getFunctionType()->getReturnType()->getKind() == Type::Kind::Void) {
                 // If the return type is void, omit the result assignment
                 _output << "call ";
             } else {
@@ -382,14 +388,14 @@ namespace Oxy {
                 _output << resultName << " = call ";
             }
 
-            emitType(((FunctionType*)call->getFunctionType())->getReturnType());
+            emitType(call->getFunctionType());
             _output << " ";
             emitValue(call->getCallee());
 
-            bool hasVarargs = ((FunctionType*)call->getFunctionType())->isVarArg();
+            bool hasVarargs = call->getFunctionType()->isVarArg();
             bool emittedEllipsis = false;
             for (size_t i = 0; i < call->getArgs().size(); i++) {
-                if (hasVarargs && i >= ((FunctionType*)call->getCallee()->getType())->getParamTypes().size() && !emittedEllipsis) {
+                if (hasVarargs && i >= call->getFunctionType()->getParamTypes().size() && !emittedEllipsis) {
                     _output << ", ...";
                     emittedEllipsis = true;
                 }
@@ -523,6 +529,31 @@ namespace Oxy {
         _context->emitError("Unknown instruction type '" + std::string(name) + "' in IREmitter");
     }
 
+    std::string IREmitter::callingConventionToString(FunctionType::CallingConvention calling_convention) {
+        switch (calling_convention) {
+            case FunctionType::CallingConvention::Fast:
+                return "fast";
+            case FunctionType::CallingConvention::Cold:
+                return "cold";
+                break;
+            case FunctionType::CallingConvention::SysV64:
+                return "sysv64";
+                break;
+            case FunctionType::CallingConvention::Win64:
+                return "win64";
+                break;
+            case FunctionType::CallingConvention::Aapcs64:
+                return "aapcs64";
+                break;
+            case FunctionType::CallingConvention::C:
+                return "c";
+                break;
+        }
+
+        _context->emitError("Unknown calling convention in IREmitter");
+        return "";
+    }
+
     void IREmitter::emitType(const Type *type) {
         if (type == nullptr || dynamic_cast<const VoidType*>(type)) {
             _output << "void";
@@ -573,7 +604,14 @@ namespace Oxy {
                 _output << "...";
             }
 
-            _output << ") -> ";
+            _output << ") ";
+
+            if (funcType->getCallingConvention() != FunctionType::CallingConvention::C) {
+                _output << callingConventionToString(funcType->getCallingConvention()) << " ";
+            }
+
+            _output << "-> ";
+
             emitType(funcType->getReturnType());
             return;
         }

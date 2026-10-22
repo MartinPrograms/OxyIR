@@ -10,11 +10,15 @@
 namespace Oxy::Instructions {
     class CallOperation : public Instruction {
     public:
-        CallOperation(Value* callee, std::vector<Value*> args) : _callee(callee), _args(std::move(args)) {}
+        CallOperation(Value* callee, FunctionType* functionType, std::vector<Value*> args) : _callee(callee), _functionType(functionType), _args(std::move(args)) {}
         ~CallOperation() override = default;
 
         [[nodiscard]] Value* getCallee() const {
             return _callee;
+        }
+
+        [[nodiscard]] FunctionType* getFunctionType() const {
+            return _functionType;
         }
 
         [[nodiscard]] const std::vector<Value*>& getArgs() const {
@@ -22,11 +26,7 @@ namespace Oxy::Instructions {
         }
 
         [[nodiscard]] Type* getType() const override {
-            return ((FunctionType*) _callee->getType())->getReturnType();
-        }
-
-        [[nodiscard]] Type* getFunctionType() const {
-            return _callee->getType();
+            return _functionType->getReturnType();
         }
 
         void accept(InstructionVisitor* visitor) override {
@@ -35,6 +35,7 @@ namespace Oxy::Instructions {
 
     private:
         Value* _callee;
+        FunctionType* _functionType;
         std::vector<Value*> _args;
     };
 } // Instructions

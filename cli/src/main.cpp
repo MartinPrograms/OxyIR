@@ -18,10 +18,10 @@ void basic(Context& context, Module& module) {
     auto formatStrData = context.toBytes((void*)formatStr, strlen(formatStr) + 1); // +1 for null terminator
     auto formatStrGlobal = module.addGlobalVariable(context.arrayType(context.i8(), strlen(formatStr) + 1), "formatStr", Data::Flags::None, 1, formatStrData);
 
-    auto printfFuncType = context.functionType(context.i32(), {context.ptr()}, true);
+    auto printfFuncType = context.functionType(context.i32(), {context.ptr()}, FunctionType::CallingConvention::C, true);
     auto printfFunc = module.addFunction(printfFuncType, "printf", Function::Flags::Extern);
 
-    auto funcType = context.functionType(context.i32(), {context.i32(), context.ptr()}, false);
+    auto funcType = context.functionType(context.i32(), {context.i32(), context.ptr()}, FunctionType::CallingConvention::C, false);
     auto func = module.addFunction(funcType, "main");
 
     auto block = func->addEntryBlock();
@@ -60,14 +60,14 @@ void basic(Context& context, Module& module) {
 
     block->addJumpNotZero(intFromPointerGreaterThanLoadedGlobal, true_block, false_block);
 
-    true_block->addCall(printfFunc, {formatStrGlobal, intFromPointerGreaterThanLoadedGlobal});
+    true_block->addCall(printfFunc, printfFuncType, {formatStrGlobal, intFromPointerGreaterThanLoadedGlobal});
 
     true_block->addReturn(fourtyTwo);
     false_block->addReturn(equality);
 }
 
 void vaarg(Context& context, Module& module) {
-    auto funcType = context.functionType(context.i32(), {}, true);
+    auto funcType = context.functionType(context.i32(), {}, FunctionType::CallingConvention::C, true);
     auto func = module.addFunction(funcType, "varargFunc");
 
     auto block = func->addEntryBlock();
@@ -203,7 +203,7 @@ void custom_instruction_set(Context& context, Module& module) {
     auto cmpxchgInstr = atomicSet->getInstruction(AtomicCompareExchange::Name);
 
     // Where arg0 is a pointer to an i32.
-    auto funcType = context.functionType(context.i32(), {context.ptr()}, false);
+    auto funcType = context.functionType(context.i32(), {context.ptr()}, FunctionType::CallingConvention::C, false);
     auto func = module.addFunction(funcType, "customInstructionSet");
 
     auto block = func->addEntryBlock();

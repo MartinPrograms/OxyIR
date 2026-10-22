@@ -25,4 +25,29 @@ namespace Oxy {
     size_t ArrayType::getAlignment() const {
         return _alignment;
     }
+
+    bool ArrayType::matches(const Type *other) const {
+        auto arrayOther = dynamic_cast<const ArrayType*>(other);
+        if (!arrayOther) {
+            return false;
+        }
+
+        if (!_elementType->matches(arrayOther->_elementType)) {
+            return false;
+        }
+
+        if (_size != arrayOther->_size) {
+            return false;
+        }
+
+        if (_isPacked != arrayOther->_isPacked) {
+            return false;
+        }
+
+        if (_alignment != arrayOther->_alignment) {
+            return false;
+        }
+
+        return true;
+    }
 } // Oxy

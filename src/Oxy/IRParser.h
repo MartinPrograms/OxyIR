@@ -14,7 +14,7 @@
 namespace Oxy {
     class IRParser {
     public:
-        explicit IRParser(Context* context, std::string input, Oxy::Module::Architecture arch, std::string name) : _context(context), _input(std::move(input)), _moduleArch(arch), _moduleName(std::move(name)) {}
+        explicit IRParser(Context* context, std::string input, Module::Architecture arch, std::string name) : _context(context), _input(std::move(input)), _moduleArch(arch), _moduleName(std::move(name)) {}
         ~IRParser() = default;
 
         std::unique_ptr<Module> parse();
@@ -22,7 +22,7 @@ namespace Oxy {
     private:
         Context* _context;
         std::string _input;
-        Oxy::Module::Architecture _moduleArch;
+        Module::Architecture _moduleArch;
         std::string _moduleName;
         std::unique_ptr<Module> _module;
 
@@ -46,7 +46,8 @@ namespace Oxy {
         Value *parseJumpNotZeroInstruction(BasicBlock * basic_block);
         Value *parsePhiInstruction(BasicBlock * basic_block);
         Value *parseCallInstruction(BasicBlock * basic_block);
-        Value * parseVaCopyInstruction(BasicBlock * basic_block);
+        Value *parseVaCopyInstruction(BasicBlock * basic_block);
+        Value *parseVaArgInstruction(BasicBlock * basic_block);
 
         Value *parseStatement(BasicBlock *basic_block);
         void parseBody(Function* function);
@@ -54,17 +55,20 @@ namespace Oxy {
         void parseData();
         void parseStruct();
 
-        std::vector<uint8_t> parseInitializer(Token * token, Type * type);
+        std::vector<uint8_t> parseInitializer(Token *token, Type *type);
 
         Type *parsePrimitiveType(const std::string& name); // i1 - i64, f32, f64
         Type *parseArrayType(); // [type, count]
         Type *parseStructType(); // { type, type, ... }
-        Type *parseFunctionType();
+        Type *parseFunctionType(); // (type, type) -> type or (type, type) conv -> type
         Type *parseType();
 
         void parseTokens();
         Token *peekToken(size_t offset = 0);
         Token *getToken();
+
+        bool tryConvention(const std::string& value, FunctionType::CallingConvention *out);
+        bool verifyCallArguments(FunctionType *fnType, const std::vector<Value *> & vector);
     };
 } // Oxy
 

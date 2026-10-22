@@ -11,6 +11,13 @@ namespace Oxy {
     public:
         explicit VariadicListType() : Type(Type::Kind::VariadicList) {}
         ~VariadicListType() override = default;
+
+        [[nodiscard]] bool matches(const Type *other) const override {
+            if (auto otherVariadicList = dynamic_cast<const VariadicListType*>(other)) {
+                return true;
+            }
+            return false;
+        }
     };
 }
 

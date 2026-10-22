@@ -17,16 +17,24 @@ namespace Oxy {
             F64
         };
 
-        explicit PrimitiveType(Kind kind) : Type(Type::Kind::Primitive), _kind(kind) {}
+        explicit PrimitiveType(Kind kind) : Type(Type::Kind::Primitive), _primitiveKind(kind) {}
 
         [[nodiscard]] Kind getPrimitiveKind() const {
-            return _kind;
+            return _primitiveKind;
         }
 
         ~PrimitiveType() override = default;
 
+        [[nodiscard]]bool matches(const Type *other) const override {
+            if (auto otherPrimitive = dynamic_cast<const PrimitiveType*>(other)) {
+                return _primitiveKind == otherPrimitive->_primitiveKind;
+            }
+
+            return false;
+        }
+
     private:
-        Kind _kind;
+        Kind _primitiveKind;
     };
 } // Oxy
 
